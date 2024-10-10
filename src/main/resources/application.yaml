@@ -1,0 +1,32 @@
+spring:
+  application.name: UserManagement
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/postgres"
+    username: postgres
+    password: postgres
+
+  flyway:
+    enabled: true
+    locations: "classpath:db/migration"
+
+logging.level.org.springframework.security: DEBUG
+logging.level.io.opentelemetry: DEBUG
+logging.level.io.opentelemetry.exporter: DEBUG
+
+
+otel:
+  propagators:
+    - tracecontext
+    - baggage
+  resource:
+    attributes:
+      deployment.environment: prod
+      service:
+        name: usernamanagement
+        namespace: iam
+  exporter:
+    otlp:
+      logs.endpoint: "http://localhost:4317"
+      metrics.endpoint: "http://localhost:4317"
+      traces.endpoint: "http://localhost:4317"
+      protocol: grpc

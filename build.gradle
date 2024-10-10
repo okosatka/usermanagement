@@ -1,0 +1,144 @@
+buildscript {
+    dependencies {
+        classpath("org.postgresql:postgresql:42.7.1")
+        classpath("org.flywaydb:flyway-database-postgresql:10.4.1")
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.4'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'org.flywaydb.flyway' version '10.11.0'
+    id 'org.jooq.jooq-codegen-gradle' version '3.19.13'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+sourceSets {
+    main {
+        java.srcDirs += 'src/generated/java'
+    }
+    integrationTest {
+        java {
+            srcDir file('src/integrationTest/java')
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    flywayMigration
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom(testImplementation)
+    integrationTestRuntimeOnly.extendsFrom(testRuntimeOnly)
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.8.0")
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-jooq'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-hateoas'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+
+    // open telemetry
+    implementation "io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter"
+    implementation 'io.opentelemetry:opentelemetry-api'
+    implementation 'io.opentelemetry:opentelemetry-sdk'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation "org.jooq:jooq-meta-extensions:${jooqVersion}"
+    implementation "org.jooq:jooq-meta:${jooqVersion}"
+    implementation "org.jooq:jooq:${jooqVersion}"
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
+    runtimeOnly 'org.postgresql:postgresql'
+
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.assertj:assertj-core:3.26.3'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'io.rest-assured:spring-mock-mvc:5.5.0'
+
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    jooqCodegen 'org.postgresql:postgresql'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+flyway {
+    url = 'jdbc:postgresql://localhost:5432/usermanagement?user=test&password=test'
+}
+
+jooq {
+    configuration {
+        jdbc {
+            driver = 'org.postgresql.Driver'
+            url = 'jdbc:postgresql://localhost:5432/usermanagement?user=test&password=test'
+        }
+        generator {
+            name = 'org.jooq.codegen.DefaultGenerator'
+            database {
+                name = 'org.jooq.meta.postgres.PostgresDatabase'
+                inputSchema = 'public'
+                excludes = 'flyway_schema_history'  // Exclude Flyway's history table
+            }
+            generate {
+                javaTimeTypes = true
+                records = true
+                immutablePojos = true
+                fluentSetters = true
+            }
+            target {
+                packageName = 'com.example.usermanagement.jooq'
+                directory = 'src/generated/java'
+            }
+        }
+    }
+
+}
+
+tasks.named("jooqCodegen") {
+    dependsOn(tasks.flywayMigrate)
+}
+
+task integrationTest(type: Test) {
+    description = "Run integration tests"
+    group = "verification"
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+}
